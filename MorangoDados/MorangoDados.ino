@@ -1,23 +1,34 @@
 
 #include <DHT.h>
-#include <DHT_U.h>
 #include <SPI.h>
 #include <SD.h>
-#include <Wire.h>
 #include <BH1750.h>
 #include <DS1307.h>
+#include <LiquidCrystal.h>
 
+// Configurando LCD
+// VSS no GND, VDD no 5v, V0 no 8, RS no 9, RW no GND, E no 10, D4 no 0, D5 no 1, D6 no 2, D7 no 3, A no 5v, e K no GND
+LiquidCrystal lcd(9, 10, 0, 1, 2, 3);
+#define constrastOutput 8
+
+// Iniciliza o leitor de SD
+//Ligue o GND ao GND, o MISO a entrada 12, o SCK a entrada 13,o MOSI a entrada 11, e 3.3V ao 3.3V
 File myFile;
-//Carrega a biblioteca do RTC DS1307
+#define chipSelect 4 
 
- 
-//Modulo RTC DS1307 ligado as portas A4 e A5 do Arduino 
-DS1307 rtc(A0, A1);
+//Modulo de relogio RTC DS1307 ligado as portas A4 e A5 do Arduino 
+//Ligue o SDA a entrada A4, o SCL a entrada A5, o GND ao GND, e VCC ao 5V
+DS1307 rtc(A0, A1); // A entrada do relogio
+
+//Modulo de medição de luz LightMeter BH1750 ligado as portas A4 e A5 do Arduino
 BH1750 lightMeter;
- 
-#define DHTPIN A2 // pino que estamos conectado
-#define DHTTYPE DHT22 // DHT 22
-#define grounHumidSignal A3
+
+// Iniciliza o Sendor DHT22 de umidade e temperatura
+#define DHTPIN A3 // pino que estamos conectado
+#define DHTTYPE DHT22 // O modelo exato
+
+//
+//#define grounHumidSignal A3
 
 // Conecte pino 1 do sensor (esquerda) ao +5V
 // Conecte pino 2 do sensor ao pino de dados definido em seu Arduino
@@ -27,55 +38,33 @@ BH1750 lightMeter;
 DHT dht(DHTPIN, DHTTYPE);
 
 
-// Pino do Arduino conectado ao pino CS do modulo
-
-#define chipSelect 10
+// Pino do Arduino conectado ao pino CS do modulo SD
+#define chipSelect 4
   
-void setup()
-{
+void setup(){
+  
   Serial.begin(9600);
-
-
-  lightMeter.begin();
+  pinMode(constrastOutput, OUTPUT);
+  analogWrite(constrastOutput, 96);
   
-  Serial.print("Initializing SD card...");
+  lcd.begin(16, 2);
+  lcd.print("hello, world!");
 
-  // see if the card is present and can be initialized:
-  if (!SD.begin(chipSelect)) {
-    Serial.println("Card failed, or not present");
-    // don't do anything more:
-    while (1);
-  }
-  Serial.println("card initialized.");
-
-  File myFile = SD.open("MORANGO.txt", FILE_WRITE);
-  myFile.println("Dia,Horario,Temperatura em Celsius,Luz,Umidade,Umidade Do Solo");
-  myFile.close();
-
-  //Aciona o relogio
-  rtc.halt(false);
-  pinMode(grounHumidSignal, INPUT);
-  //As linhas abaixo setam a data e hora do modulo
-  //e podem ser comentada apos a primeira utilizacao
-  rtc.setDOW(MONDAY);      //Define o dia da semana
-  rtc.setTime(15, 42, 00);     //Define o horario
-  rtc.setDate(02, 03, 2018);   //Define o dia, mes e ano
-  pinMode(LED_BUILTIN, OUTPUT);
-  //Definicoes do pino SQW/Out
-  rtc.setSQWRate(SQW_RATE_1);
-  rtc.enableSQW(true);
-  pinMode(9, INPUT_PULLUP);
+  configureClock();
+  configureSD();
+  lightMeter.begin();
+  //pinMode(grounHumidSignal, INPUT);
   dht.begin();
 }
-void loop() 
-{ 
+void loop() {
+   
   File myFile = SD.open("MORANGO.txt", FILE_WRITE);
-  int sensorVal = digitalRead(9);
+  //int sensorVal = digitalRead(9);
   float humid = dht.readHumidity();
   float temp = dht.readTemperature();
-  int groundHumid = analogRead(grounHumidSignal);
+  //int groundHumid = analogRead(grounHumidSignal);
   uint16_t lux = lightMeter.readLightLevel();
-  
+
   // if the file is available, write to it:
   if (myFile) {
     myFile.print(rtc.getDateStr(FORMAT_SHORT));
@@ -86,20 +75,48 @@ void loop()
     myFile.print(",");
     myFile.print(lux);
     myFile.print(",");
-    myFile.print(humid);
-    myFile.print(",");
-    myFile.println(groundHumid);
+    myFile.println(humid);
+    //myFile.print(",");
+    //myFile.println(groundHumid);
     myFile.close();
+  delay(5000);
 
   }
   // if the file isn't open, pop up an error:
   else {
-    Serial.println("error opening morango.txt.txt");
+    Serial.println("error opening morango.txt");
+     while (1);
   }
-  if (sensorVal == LOW) {
-    Serial.print("File Closed");
-    while (1) {}
-  } 
-  delay(1000);
+  
+  
 
+  lcd.setCursor(0, 1);
+  lcd.print("hello, world!");
+  delay(5000);
+}
+
+void configureClock(){ 
+  
+  //Aciona o relogio
+  rtc.halt(false);
+  
+  //Definicoes do pino SQW/Out
+  rtc.setSQWRate(SQW_RATE_1);
+  rtc.enableSQW(true);
+
+ }
+void configureSD(){
+  
+  Serial.print("Initializing SD card...");
+
+  // see if the card is present and can be initialized:
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+  }
+  Serial.println("card initialized.");
+
+  File myFile = SD.open("MORANGO.txt", FILE_WRITE);
+  myFile.println("Dia,Horario,Temperatura em Celsius,Luz,Umidade,Umidade Do Solo");
+  myFile.close();
 }
